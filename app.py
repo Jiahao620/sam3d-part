@@ -15,6 +15,36 @@ os.environ.setdefault('XFORMERS_DISABLED', '1')
 
 import gc
 import gradio as gr
+
+# gradio_client 1.3.x 的 JSON-schema 转换器假定 additionalProperties 一定是 dict，
+# 但 pydantic 2.11+ 对 dict[str, Any] 会生成 `additionalProperties: true`（布尔），
+# 于是构建 API schema 时抛 "TypeError: argument of type 'bool' is not iterable"，
+# 页面返回 500。上游至今未修；这里就地打一个等价的兼容垫片。
+def _patch_gradio_client_bool_schema():
+    try:
+        import gradio_client.utils as _gcu
+    except Exception:
+        return
+    _orig = _gcu._json_schema_to_python_type
+
+    def _safe(schema, defs=None):
+        if isinstance(schema, bool):        # 布尔 schema：true=任意，false=无
+            return "Any" if schema else "None"
+        return _orig(schema, defs)
+
+    _gcu._json_schema_to_python_type = _safe
+    if hasattr(_gcu, "get_type"):
+        _orig_get_type = _gcu.get_type
+
+        def _safe_get_type(schema):
+            if not isinstance(schema, dict):
+                return "Any"
+            return _orig_get_type(schema)
+
+        _gcu.get_type = _safe_get_type
+
+
+_patch_gradio_client_bool_schema()
 import numpy as np
 import torch
 import cv2
@@ -135,16 +165,70 @@ _config.compile_model = False
 _config.workspace_dir = os.path.dirname(config_path)
 _config._target_ = "sam3d_objects.pipeline.inference_pipeline_pointmap.InferencePartPipelinePointMap_compress_hunyuan3d_new_vae"
 check_hydra_safety(_config, WHITELIST_FILTERS, BLACKLIST_FILTERS)
+
+# ---------------------------------------------------------------------------
+# 只加载推理真正用到的权重（SKIP_UNUSED_WEIGHTS=0 可恢复原样全量加载）
+#
+# 下面每一项都对照调用图核实过：
+#   MoGe (~1.2G)        pipeline.yaml 的 depth_model，仅当调用方不传 pointmap 时
+#                       才会走到；本 app 的 pointmap 永远由 pytorch3d 渲染得出。
+#   ss_generator.ckpt   6.3G。它提供 ss_generator 和 ss_condition_embedder 两个
+#       (6.3G)          模块的初值，而下面我们的 stage-1 权重会把它们逐张量完全
+#                       覆盖（945/945 + 722/722 键全部命中）。跳过加载后，由
+#                       load_state_dict 的 missing_keys 断言保证没有参数被漏掉
+#                       —— 一旦将来 ckpt 结构变化导致覆盖不全，会立刻报错而不是
+#                       静默使用随机权重。
+# 这些都是本进程内的属性替换，不写磁盘，也不影响其他脚本。
+# ---------------------------------------------------------------------------
+SKIP_UNUSED_WEIGHTS = os.environ.get("SKIP_UNUSED_WEIGHTS", "1") == "1"
+_SKIP_CKPT_BASENAMES = {"ss_generator.ckpt"}
+
+if SKIP_UNUSED_WEIGHTS:
+    import moge.model.v1 as _moge_v1
+    _moge_v1.MoGeModel.from_pretrained = staticmethod(lambda *a, **k: torch.nn.Module())
+
+    from sam3d_objects.pipeline.inference_pipeline import InferencePipeline as _IP
+    _orig_instantiate_and_load = _IP.instantiate_and_load_from_pretrained
+
+    def _instantiate_skipping_unused(self, config, ckpt_path, *a, **kw):
+        if os.path.basename(str(ckpt_path)) in _SKIP_CKPT_BASENAMES:
+            print(f"[slim] 跳过加载 {os.path.basename(str(ckpt_path))}"
+                  f"（随后由 stage-1 权重完全覆盖）", flush=True)
+            model = instantiate(config)
+            model.eval()
+            for p in model.parameters():
+                p.requires_grad_(False)
+            return model.to(kw.get("device", self.device))
+        return _orig_instantiate_and_load(self, config, ckpt_path, *a, **kw)
+
+    _IP.instantiate_and_load_from_pretrained = _instantiate_skipping_unused
+    print("[slim] 跳过未使用的权重: MoGe, ss_generator.ckpt", flush=True)
+
 sam3dpart_pipeline = instantiate(_config)
 
 ss_states = torch.load("checkpoints/stage1/sam3dpart_stage1_dit.ckpt", map_location=torch.device('cpu'))
 if 'state_dict' in ss_states:
     ss_states = ss_states['state_dict']
 sam3dpart_pipeline.models['ss_generator'].reverse_fn.backbone.latent_mapping.shape = expand_latent_mapping_channels(sam3dpart_pipeline.models['ss_generator'].reverse_fn.backbone.latent_mapping.shape)
-sam3dpart_pipeline.models['ss_generator'].load_state_dict({k.replace(f"models.ss_generator.", ""): v for k, v in ss_states.items()}, False)
-sam3dpart_pipeline.models['global_ss_condition_embedder'].load_state_dict({k.replace(f"models.global_ss_condition_embedder.", ""): v for k, v in ss_states.items()}, False)
-sam3dpart_pipeline.condition_embedders["ss_condition_embedder"].load_state_dict({k.replace(f"models.ss_condition_embedder.", ""): v for k, v in ss_states.items()}, False)
-sam3dpart_pipeline.models['global_ss_condition_type_emb'].load_state_dict({k.replace(f"models.global_ss_condition_type_emb.", ""): v for k, v in ss_states.items()}, False)
+_missing = {}
+_missing['ss_generator'] = sam3dpart_pipeline.models['ss_generator'].load_state_dict({k.replace(f"models.ss_generator.", ""): v for k, v in ss_states.items()}, False)
+_missing['global_ss_condition_embedder'] = sam3dpart_pipeline.models['global_ss_condition_embedder'].load_state_dict({k.replace(f"models.global_ss_condition_embedder.", ""): v for k, v in ss_states.items()}, False)
+_missing['ss_condition_embedder'] = sam3dpart_pipeline.condition_embedders["ss_condition_embedder"].load_state_dict({k.replace(f"models.ss_condition_embedder.", ""): v for k, v in ss_states.items()}, False)
+_missing['global_ss_condition_type_emb'] = sam3dpart_pipeline.models['global_ss_condition_type_emb'].load_state_dict({k.replace(f"models.global_ss_condition_type_emb.", ""): v for k, v in ss_states.items()}, False)
+
+if SKIP_UNUSED_WEIGHTS:
+    # 跳过 ss_generator.ckpt 的前提是「stage-1 权重覆盖得一个不漏」。这里验证它：
+    # 任何 missing key 都意味着该参数仍是随机初始化，必须立刻暴露出来。
+    for _name in ('ss_generator', 'ss_condition_embedder'):
+        _mk = list(_missing[_name].missing_keys)
+        if _mk:
+            raise RuntimeError(
+                f"stage-1 权重未能完全覆盖 {_name}：缺少 {len(_mk)} 个参数"
+                f"（例如 {_mk[:3]}）。这些参数当前是随机值。请设置环境变量 "
+                f"SKIP_UNUSED_WEIGHTS=0 以回退到加载 ss_generator.ckpt 的原有行为。")
+    print(f"[slim] 校验通过：stage-1 权重完全覆盖 ss_generator "
+          f"({len(sam3dpart_pipeline.models['ss_generator'].state_dict())} 参数) "
+          f"与 ss_condition_embedder", flush=True)
 
 # Load XYZ VAE v3 decoder (occ-conditioned)
 xyz_states = torch.load("checkpoints/vae/xyz_decoder.pt", map_location=torch.device('cpu'))
@@ -165,17 +249,47 @@ from trellis2.pipelines import Trellis2ImageTo3DPipeline
 import o_voxel
 
 print("Loading TRELLIS.2 refinement pipeline...")
+if SKIP_UNUSED_WEIGHTS:
+    # from_pretrained 默认会下载并加载全部 8 个模型；本 app 只用 shape 分支。
+    # 用官方自带的 model_names_to_load 钩子只保留需要的三个，省约 8.4 GB：
+    #   sparse_structure_flow_model (2.5G) + sparse_structure_decoder
+    #       —— 原代码加载后立刻 del（我们改为体素化 coarse mesh，不采样 SS）
+    #   tex_slat_flow_model_512/1024 (各 2.5G) + tex_slat_decoder (905M)
+    #       —— 仅 PBR 烘焙用，而 PBR 复选框默认关闭
+    # 另外 BiRefNet 抠图模型 (~425M) 也不需要：preprocess_image 只在输入没有
+    # 真实 alpha 时才调用它，而本 app 传入的永远是 RGBA + part mask。
+    Trellis2ImageTo3DPipeline.model_names_to_load = [
+        'shape_slat_flow_model_512',
+        'shape_slat_flow_model_1024',
+        'shape_slat_decoder',
+    ]
+    from trellis2.pipelines import rembg as _t2_rembg
+
+    class _NoRembg:
+        def __init__(self, *a, **k): pass
+        def to(self, *a, **k): return self
+        def cpu(self, *a, **k): return self
+        def __call__(self, *a, **k):
+            raise RuntimeError(
+                "BiRefNet 已在启动时跳过 (SKIP_UNUSED_WEIGHTS=1)。本 app 传给 "
+                "TRELLIS.2 的图像始终带 part mask 作为 alpha，不应走到抠图分支。")
+
+    _t2_rembg.BiRefNet = _NoRembg
+    print("[slim] TRELLIS.2 只加载 shape 分支（跳过 sparse-structure / tex / BiRefNet）",
+          flush=True)
+
 trellis2_pipeline = Trellis2ImageTo3DPipeline.from_pretrained("microsoft/TRELLIS.2-4B")
-# Remove SS models we don't need (we voxelize coarse mesh instead)
-del trellis2_pipeline.models['sparse_structure_decoder']
-del trellis2_pipeline.models['sparse_structure_flow_model']
-# tex_slat_flow_model_* kept so we can optionally bake PBR textures via to_glb
+# SS models are not needed (we voxelize the coarse mesh instead). 精简模式下它们
+# 本就没被加载；全量模式下按原逻辑删除。
+trellis2_pipeline.models.pop('sparse_structure_decoder', None)
+trellis2_pipeline.models.pop('sparse_structure_flow_model', None)
 # Keep all models on CPU; low_vram mode moves them to GPU on demand
 trellis2_pipeline.low_vram = True
 trellis2_pipeline._device = torch.device('cuda')
 gc.collect()
 torch.cuda.empty_cache()
-print("TRELLIS.2 refinement pipeline loaded (low_vram mode, models on CPU).")
+print(f"TRELLIS.2 refinement pipeline loaded (low_vram mode, models on CPU): "
+      f"{sorted(trellis2_pipeline.models.keys())}")
 
 
 # --- Mesh Loading ---
@@ -1027,6 +1141,11 @@ def _refine_with_trellis2_impl(
 
     # Step 4: Optionally sample texture SLat (PBR) using same cond + shape_slat
     tex_slat = None
+    if pbr_baking and 'tex_slat_flow_model_1024' not in trellis2_pipeline.models:
+        # 精简加载模式下 tex 模型未被加载（见启动处的 SKIP_UNUSED_WEIGHTS）
+        print("[slim] 勾选了 PBR 烘焙，但 tex 模型未加载。若需要 PBR，请用 "
+              "SKIP_UNUSED_WEIGHTS=0 重启。本次跳过 PBR。")
+        pbr_baking = False
     if pbr_baking:
         if t2_pipeline_type == "512":
             tex_flow_model = trellis2_pipeline.models['tex_slat_flow_model_512']

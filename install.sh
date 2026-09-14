@@ -42,14 +42,37 @@ python -c "import sys; assert sys.version_info[:2]==(3,11)" 2>/dev/null || \
 say "2/7 PyTorch 2.6.0 + cu124"
 pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
 
+# 全局约束：numpy 和 torch 的版本必须锁死。很多包（rembg/pyvista/o-voxel 等）
+# 依赖声明里不带上限，pip 会顺手把它们升级，导致所有按 numpy 1.x / torch 2.6
+# 编译的扩展在运行时报 ABI 错误——这类故障现场离真正原因很远，极难排查。
+export PIP_CONSTRAINT="$EXT_DIR/constraints.txt"
+cat > "$PIP_CONSTRAINT" <<'CONSTRAINTS'
+numpy==1.26.4
+torch==2.6.0
+torchvision==0.21.0
+CONSTRAINTS
+echo "已启用版本约束: $PIP_CONSTRAINT"
+
 say "3/7 基础依赖"
 pip install \
     numpy==1.26.4 scipy==1.17.1 opencv-python==4.9.0.80 open3d==0.18.0 \
     trimesh==4.11.5 scikit-image==0.26.0 transformers==4.57.6 diffusers==0.37.1 \
     hydra-core==1.3.2 omegaconf==2.3.0 pytorch-lightning==2.6.1 peft==0.18.1 \
-    gradio==4.44.1 gradio_litmodel3d==0.0.1 \
+    gradio==4.44.1 gradio_client==1.3.0 gradio_litmodel3d==0.0.1 \
+    pydantic==2.11.10 fastapi==0.135.2 \
     imageio imageio-ffmpeg tqdm easydict ninja pandas loguru einops seaborn \
-    matplotlib huggingface_hub safetensors pymeshlab
+    matplotlib huggingface_hub safetensors pymeshlab plyfile zstandard \
+    rembg onnxruntime xatlas pyvista pymeshfix igraph timm \
+    optree astor torchdiffeq lpips wandb lightning pythreejs
+# pydantic/fastapi 必须按参考环境 pin：新版 pydantic 会产生布尔型 JSON
+# schema，gradio_client 1.3.0 解析不了，构建 UI 时会抛
+# "TypeError: argument of type 'bool' is not iterable"。
+# 最后一行那批是 TRELLIS 的依赖：wheels/TRELLIS/trellis/__init__.py 会连带
+# 导入 pipelines（需要 rembg/onnxruntime），而 postprocessing_utils 顶层就
+# import 了 xatlas / pyvista / pymeshfix / igraph——app.py 直接依赖该模块。
+# 无头服务器上 opencv-python 需要 libGL；若你的机器没装图形库，改用
+#   pip install opencv-python-headless==4.9.0.80
+# 二者不要同时安装。
 
 say "4/7 注意力后端 (flash-attn / xformers / spconv)"
 pip install flash-attn==2.7.3 --no-build-isolation || \
@@ -65,28 +88,54 @@ pip install "git+https://github.com/facebookresearch/pytorch3d.git@75ebeeaea0908
 pip install "git+https://github.com/nerfstudio-project/gsplat.git@2323de5905d5e90e035f792fe65bad0fedd413e7" --no-build-isolation
 
 say "6/7 kaolin (需与 torch 版本匹配)"
-pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.6.0_cu124.html || \
+# 参考环境用的是 0.17.0，但 NVIDIA 的 torch-2.6.0_cu124 索引上只提供 0.18.0；
+# 本项目只用到 kaolin 的 notebook 可视化 API（IpyTurntableVisualizer / Camera），
+# 两个版本在这部分兼容。--no-deps 避免它把 torch 拉走。
+pip install kaolin==0.18.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.6.0_cu124.html --no-deps || \
     echo "kaolin 预编译包安装失败，请参考 https://kaolin.readthedocs.io 按你的 torch/CUDA 组合安装"
+# kaolin 的运行时依赖（因上面用了 --no-deps，需显式安装）
+pip install pygltflib ipywidgets ipycanvas ipyevents usd-core warp-lang
 
 say "7/7 CUDA 扩展（从源码编译，最耗时）"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-clone_build () {   # clone_build <名字> <git地址> <分支或空> <递归?>
-    local name="$1" url="$2" branch="${3:-}" recursive="${4:-}"
+
+# conda 环境自带的 compiler_compat/ld 不搜索系统库路径，链接 CUDA driver 库
+# (-lcuda) 时会报 "cannot find -lcuda"。把 CUDA stubs 和驱动库目录显式加入
+# 链接搜索路径即可（stubs 是 NVIDIA 提供的链接期占位库，运行时用真实驱动）。
+_CUDA_LIBDIR="$(dirname "$(dirname "$(command -v nvcc)")")/lib64/stubs"
+for d in "$_CUDA_LIBDIR" /usr/local/cuda/lib64/stubs /usr/lib/x86_64-linux-gnu; do
+    [ -d "$d" ] && export LIBRARY_PATH="${LIBRARY_PATH:+$LIBRARY_PATH:}$d"
+done
+echo "链接库搜索路径: $LIBRARY_PATH"
+
+# 必须加 --no-deps：这些扩展的 pyproject 里把 torch 写成了无版本约束的依赖
+# （o-voxel 还用 `cumesh @ git+...` 这种直接 URL 依赖），不加的话 pip 会重新
+# 解析并把 torch 升级到最新版，拖进整套新 CUDA 运行库，导致前面按 2.6.0
+# 编译好的扩展全部失效。它们的运行时依赖已在第 3 步统一装好。
+clone_build () {   # clone_build <名字> <git地址> <分支或空> <递归?> <optional?>
+    local name="$1" url="$2" branch="${3:-}" recursive="${4:-}" optional="${5:-}"
     if [ ! -d "$EXT_DIR/$name" ]; then
         echo "[$name] clone..."
         git clone ${branch:+-b "$branch"} ${recursive:+--recursive} "$url" "$EXT_DIR/$name"
     fi
     echo "[$name] build & install..."
-    pip install "$EXT_DIR/$name" --no-build-isolation
+    if [ -n "$optional" ]; then
+        pip install "$EXT_DIR/$name" --no-build-isolation --no-deps || \
+            echo "[$name] 安装失败——该组件为可选，推理不需要，继续。"
+    else
+        pip install "$EXT_DIR/$name" --no-build-isolation --no-deps
+    fi
 }
 clone_build nvdiffrast https://github.com/NVlabs/nvdiffrast.git          v0.4.0
-clone_build nvdiffrec  https://github.com/JeffreyXiang/nvdiffrec.git     renderutils
 clone_build CuMesh     https://github.com/JeffreyXiang/CuMesh.git        ""  yes
 clone_build FlexGEMM   https://github.com/JeffreyXiang/FlexGEMM.git      ""  yes
 clone_build cubvh      https://github.com/ashawkey/cubvh.git             ""  yes
 # o_voxel 随本仓库分发（wheels/TRELLIS.2/o-voxel），直接就地编译
 echo "[o_voxel] build & install..."
-pip install "$REPO_DIR/wheels/TRELLIS.2/o-voxel" --no-build-isolation
+pip install "$REPO_DIR/wheels/TRELLIS.2/o-voxel" --no-build-isolation --no-deps
+# nvdiffrec 只被 TRELLIS.2 的 PBR 渲染器用到，本 app 的推理路径不需要；
+# 标为可选，编译失败不影响其余流程。
+clone_build nvdiffrec  https://github.com/JeffreyXiang/nvdiffrec.git     renderutils "" optional
 
 say "自检"
 python - <<'PYEOF'
@@ -106,6 +155,10 @@ if bad:
     print("\n以下模块未装好：" + ", ".join(bad))
     sys.exit(1)
 import torch
+if not torch.__version__.startswith("2.6.0"):
+    print(f"\n警告：torch 版本是 {torch.__version__}，预期 2.6.0。"
+          "某个 pip 包可能把它升级了，CUDA 扩展将无法加载。")
+    sys.exit(1)
 print(f"\ntorch {torch.__version__} | CUDA {torch.version.cuda} | 可用 GPU {torch.cuda.device_count()}")
 print("环境就绪。下一步按 README「Weights」下载权重，然后 python app.py")
 PYEOF
