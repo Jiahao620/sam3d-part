@@ -143,6 +143,9 @@ EU, UK, or South Korea.
   only because the app imports helper functions from them; their data paths
   point to internal storage and they are not runnable as released.
 
+<!-- The paper is not public yet. Uncomment once it is, and check the
+     booktitle against the official ACM proceedings name.
+
 ## Citation
 
 ```bibtex
@@ -155,3 +158,4 @@ EU, UK, or South Korea.
   year      = {2026}
 }
 ```
+-->

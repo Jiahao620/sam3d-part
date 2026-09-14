@@ -37,22 +37,6 @@ mirrors this layout:
 hf download bj6/sam3d-part --local-dir checkpoints
 ```
 
-## How the pieces fit together
-
-1. **Stage 1** — the part DiT takes the input view (RGB + click mask +
-   pointmap) and the whole object's Hunyuan3D shape latent, and generates the
-   part's occupancy latent plus an XYZ latent. `occ_encoder` / the SAM 3D
-   Objects occupancy decoder and `xyz_decoder` turn those latents into a 64³
-   voxel part and its pose.
-2. **Coarse mesh** — the SAM 3D Objects SLat stage meshes that occupancy.
-3. **Refinement** — TRELLIS.2 regenerates the mesh at high resolution from the
-   coarse mesh's voxelization.
-
-`stage1/sam3dpart_stage1_dit.ckpt` also carries frozen copies of modules that
-are loaded from their own sources at run time (the SAM 3D Objects occupancy
-encoder/decoder and the Hunyuan3D 2.1 ShapeVAE); the application does not read
-them from this checkpoint.
-
 ## Configs
 
 The model configuration files (`*.yaml`) live in the **code repository**, not
@@ -74,6 +58,9 @@ consistency with the pipeline they are part of.
 
 See `NOTICE.md` in the code repository for the full component/license mapping.
 
+<!-- The paper is not public yet. Uncomment once it is, and check the
+     booktitle against the official ACM proceedings name.
+
 ## Citation
 
 ```bibtex
@@ -86,3 +73,4 @@ See `NOTICE.md` in the code repository for the full component/license mapping.
   year      = {2026}
 }
 ```
+-->
