@@ -1213,6 +1213,16 @@ def _refine_with_trellis2_impl(
     cu = cumesh.CuMesh()
     cu.init(new_verts, new_faces)
     cu.fill_holes(max_hole_perimeter=3e-2)
+    # 两段式减面，与 o_voxel.postprocess.to_glb 的官方顺序一致：先降到目标的
+    # 3 倍、做一轮完整清理（补洞/修非流形/去碎块），再降到目标。一步从数百万
+    # 面直砍到目标会把网格打碎——实测 4.98M -> 275k（18x）单步减面后出现了
+    # 3415 个连通块、最大块只占 58.5%。中间那轮清理是防碎的关键。
+    if int(cu.num_faces) > _target * 3:
+        cu.simplify(_target * 3)
+        cu.remove_duplicate_faces()
+        cu.repair_non_manifold_edges()
+        cu.remove_small_connected_components(1e-5)
+        cu.fill_holes(max_hole_perimeter=3e-2)
     cu.simplify(_target)
     cu.remove_duplicate_faces()
     cu.repair_non_manifold_edges()
@@ -1221,6 +1231,22 @@ def _refine_with_trellis2_impl(
     cu.unify_face_orientations()
     out_verts, out_faces = cu.read()
     print(f"[TRELLIS.2] After remesh+cleanup(target={_target}): verts={out_verts.shape[0]}, faces={out_faces.shape[0]}, time={_time.time() - _t1:.1f}s")
+    # 连通性诊断：最大块占比远小于 1 说明网格碎了，通常是减面过于激进
+    try:
+        import numpy as _np
+        from scipy.sparse import coo_matrix as _coo
+        from scipy.sparse.csgraph import connected_components as _cc
+        _v = out_verts.cpu().numpy(); _f = out_faces.cpu().numpy()
+        _e = _np.concatenate([_f[:, [0, 1]], _f[:, [1, 2]], _f[:, [2, 0]]], 0)
+        _g = _coo((_np.ones(len(_e), _np.int8), (_e[:, 0], _e[:, 1])), shape=(len(_v),) * 2)
+        _n, _lab = _cc(_g, directed=False)
+        _sz = _np.bincount(_lab)
+        print(f"[TRELLIS.2] Connectivity: {_n} components, largest holds "
+              f"{_sz.max() / max(len(_v), 1):.1%} of vertices"
+              + ("  <-- 网格偏碎，可调小 Decimation Target 或检查 stage-1 voxel"
+                 if _sz.max() / max(len(_v), 1) < 0.9 else ""))
+    except Exception as _e:
+        print(f"[TRELLIS.2] connectivity check skipped ({type(_e).__name__})")
 
     refined_mesh = trimesh.Trimesh(
         vertices=out_verts.cpu().numpy(),
