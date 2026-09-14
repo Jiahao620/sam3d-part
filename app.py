@@ -1346,20 +1346,9 @@ def _refine_with_trellis2_impl(
     return refined_mesh, pbr_mesh
 
 
-def execute_sam3dpart(original_image, mask, pointmap, sample_state, rand_color_state, user_id, part_cache_state, part_voxel_history, use_pose_head=False, use_mesh_cond=True, enable_cache=True, enable_pose_refine=False, pose_refine_mode="render_icp", enable_trellis2=False, t2_pipeline_type="1024", t2_shape_steps=12, t2_shape_guidance=7.5, t2_decimation_target=0, enable_pbr_baking=False, pbr_texture_size=2048, progress=gr.Progress()):
+def execute_sam3dpart(original_image, mask, pointmap, sample_state, rand_color_state, user_id, part_cache_state, part_voxel_history, use_pose_head=False, use_mesh_cond=True, enable_cache=True, enable_pose_refine=False, pose_refine_mode="render_icp", enable_trellis2=False, t2_pipeline_type="1024", t2_shape_steps=12, t2_shape_guidance=7.5, t2_decimation_target=0, enable_pbr_baking=False, pbr_texture_size=2048):
     import time as _t_mod
     _t_start = _t_mod.time()
-
-    def _step(frac, msg):
-        """向 UI 汇报进度：分数 + 阶段说明 + 已用时。"""
-        el = _t_mod.time() - _t_start
-        try:
-            progress(frac, desc=f"{msg}  ·  已用时 {el:.0f}s")
-        except Exception:
-            pass
-        print(f"[progress] {frac:.0%} {msg} ({el:.0f}s)", flush=True)
-
-    _step(0.02, "采样物体表面点云")
     pc_size = 81920  # Fixed for Hunyuan3D 2.1 ShapeVAE
     clean_surface_points, clean_surface_normals, center, scale = process_single_mesh(
         mesh=sample_state,
@@ -1412,7 +1401,6 @@ def execute_sam3dpart(original_image, mask, pointmap, sample_state, rand_color_s
     else:
         part_cache = part_cache_state[None]  # (1, 1, 64, 64, 64)
 
-    _step(0.10, "Stage-1：预测 part 体素与位姿")
     if type(pointmap) == list:
         rgb = torch.tensor(pointmap[1]).permute(2, 0, 1).float() / 255.0
         rgb = torch.cat([rgb, mask_t[None]], dim=0).cpu()
@@ -1422,7 +1410,6 @@ def execute_sam3dpart(original_image, mask, pointmap, sample_state, rand_color_s
         pointmap_t = torch.tensor(pointmap).float().cpu()
         output = sam3dpart_pipeline.run(image[None], global_ss=global_ss[None], seed=42, pointmap=pointmap_t[None], part_cache=part_cache)
 
-    _step(0.45, "Stage-1 完成，整理 coarse mesh")
     vertices = output['glb'].vertices @ np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
     # vertices = output['glb'].vertices
     if use_pose_head:
@@ -1504,7 +1491,6 @@ def execute_sam3dpart(original_image, mask, pointmap, sample_state, rand_color_s
         render_img_for_t2.save(debug_path)
         print(f"[TRELLIS.2 Debug] Input image saved to {debug_path}")
 
-        _step(0.55, "TRELLIS.2 高分辨率精修（最耗时，约 30-60s）")
         refined_shape, refined_pbr = refine_with_trellis2(
             part_mesh_textured, render_img_for_t2, user_dir_base,
             t2_pipeline_type=t2_pipeline_type,
@@ -1600,7 +1586,6 @@ def execute_sam3dpart(original_image, mask, pointmap, sample_state, rand_color_s
         scene.add_geometry(mesh_view, geom_name=geom_name)
         scene.export(scene_path)
 
-    _step(0.92, "导出 GLB 并写入场景")
     _add_to_scene(color_path,    part_mesh_color)
     _add_to_scene(textured_path, part_mesh_textured)
 
@@ -1649,7 +1634,7 @@ def execute_sam3dpart(original_image, mask, pointmap, sample_state, rand_color_s
         part_voxel_history = []
     part_voxel_history.append(new_part_voxel)
 
-    _step(1.0, "完成")
+    print(f"[timing] generate 总耗时 {_t_mod.time() - _t_start:.1f}s", flush=True)
     torch.cuda.empty_cache()
     return color_path, colors, part_cache_state, part_voxel_history
 
