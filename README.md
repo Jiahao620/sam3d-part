@@ -1,10 +1,33 @@
-# SAM3D-Part — Interactive Demo Release
+<div align="center">
 
-Reference implementation of **SAM3D-Part: Interactive Part Selection and
-Generation from 3D Objects** (SIGGRAPH Asia 2026): pick a part of a 3D object
-by clicking on a rendered view, and get that part back as its own mesh, posed
-in the object's frame. This release contains everything needed to run the
-gradio demo:
+# SAM3D-Part: Interactive Part Selection and Generation from 3D Objects
+
+**SIGGRAPH Asia 2026**
+
+Jiahao Chang<sup>1,2,3</sup>&nbsp;&nbsp;
+Dong Du<sup>4</sup>&nbsp;&nbsp;
+Wanhu Sun<sup>1</sup>&nbsp;&nbsp;
+Yujian Zheng<sup>5</sup>&nbsp;&nbsp;
+Chuanyu Pan<sup>3</sup><br>
+Bowen Zhao<sup>3</sup>&nbsp;&nbsp;
+Chongjie Ye<sup>1,2</sup>&nbsp;&nbsp;
+Yuanming Hu<sup>3</sup>&nbsp;&nbsp;
+Xiaoguang Han<sup>1,2,6</sup>
+
+<sup>1</sup>SSE, CUHKSZ&nbsp;&nbsp;
+<sup>2</sup>FNii-Shenzhen&nbsp;&nbsp;
+<sup>3</sup>Meshy AI&nbsp;&nbsp;
+<sup>4</sup>Nanjing University of Science and Technology<br>
+<sup>5</sup>MBZUAI&nbsp;&nbsp;
+<sup>6</sup>GenuX
+
+![SAM3D-Part teaser](assets/teaser.png)
+
+</div>
+
+Pick a part of a 3D object by clicking on a rendered view, and get that part
+back as its own mesh, posed in the object's frame. This release contains
+everything needed to run the gradio demo:
 
 ```
 CUDA_VISIBLE_DEVICES=0 python app.py
