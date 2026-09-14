@@ -4,15 +4,15 @@
 
 **SIGGRAPH Asia 2026**
 
-Jiahao Chang<sup>1,2,3</sup>&nbsp;&nbsp;
-Dong Du<sup>4</sup>&nbsp;&nbsp;
+Jiahao Chang<sup>1,2,3&#42;&dagger;</sup>&nbsp;&nbsp;
+Dong Du<sup>4&dagger;</sup>&nbsp;&nbsp;
 Wanhu Sun<sup>1</sup>&nbsp;&nbsp;
 Yujian Zheng<sup>5</sup>&nbsp;&nbsp;
-Chuanyu Pan<sup>3</sup><br>
+Chuanyu Pan<sup>3&Dagger;</sup><br>
 Bowen Zhao<sup>3</sup>&nbsp;&nbsp;
 Chongjie Ye<sup>1,2</sup>&nbsp;&nbsp;
 Yuanming Hu<sup>3</sup>&nbsp;&nbsp;
-Xiaoguang Han<sup>1,2,6</sup>
+Xiaoguang Han<sup>1,2,6&sect;</sup>
 
 <sup>1</sup>SSE, CUHKSZ&nbsp;&nbsp;
 <sup>2</sup>FNii-Shenzhen&nbsp;&nbsp;
@@ -20,6 +20,11 @@ Xiaoguang Han<sup>1,2,6</sup>
 <sup>4</sup>Nanjing University of Science and Technology<br>
 <sup>5</sup>MBZUAI&nbsp;&nbsp;
 <sup>6</sup>GenuX
+
+<sub><sup>&#42;</sup>Work done during internship at Meshy AI.&nbsp;&nbsp;
+<sup>&dagger;</sup>These authors contributed equally to this work.<br>
+<sup>&Dagger;</sup>Project leader.&nbsp;&nbsp;
+<sup>&sect;</sup>Corresponding authors.</sub>
 
 ![SAM3D-Part teaser](assets/teaser.png)
 
