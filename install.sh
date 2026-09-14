@@ -87,6 +87,12 @@ pip install \
 pip install "git+https://github.com/facebookresearch/pytorch3d.git@75ebeeaea0908c5527e7b1e305fbc7681382db47" --no-build-isolation
 pip install "git+https://github.com/nerfstudio-project/gsplat.git@2323de5905d5e90e035f792fe65bad0fedd413e7" --no-build-isolation
 
+# torch_cluster：Hunyuan3D ShapeVAE 的编码器在函数内部惰性 import 它做最远点
+# 采样（fps）。因为不是顶层 import，启动时不会报错——要等到用户点 Generate
+# 才崩在 "No module named 'torch_cluster'"。必须按 torch 版本装对应轮子。
+pip install torch_cluster==1.6.3 -f https://data.pyg.org/whl/torch-2.6.0+cu124.html --no-deps || \
+    echo "torch_cluster 安装失败——生成 part 时会报错，请按 https://data.pyg.org/whl 选择匹配你 torch/CUDA 的轮子"
+
 say "6/7 kaolin (需与 torch 版本匹配)"
 # 参考环境用的是 0.17.0，但 NVIDIA 的 torch-2.6.0_cu124 索引上只提供 0.18.0；
 # 本项目只用到 kaolin 的 notebook 可视化 API（IpyTurntableVisualizer / Camera），
@@ -143,7 +149,7 @@ import importlib, sys
 mods = ["torch", "torchvision", "numpy", "scipy", "cv2", "open3d", "trimesh",
         "hydra", "omegaconf", "pytorch_lightning", "gradio", "gradio_litmodel3d",
         "segment_anything", "moge", "utils3d", "pytorch3d", "kaolin", "gsplat",
-        "spconv", "o_voxel", "cumesh", "flex_gemm", "nvdiffrast"]
+        "spconv", "o_voxel", "cumesh", "flex_gemm", "nvdiffrast", "torch_cluster"]
 bad = []
 for m in mods:
     try:
