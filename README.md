@@ -1,7 +1,9 @@
 # SAM3D-Part — Interactive Demo Release
 
-Interactive part-level 3D generation from a single click on a rendered mesh
-(SIGGRAPH Asia 2026). This release contains everything needed to run the
+Reference implementation of **SAM3D-Part: Interactive Part Selection and
+Generation from 3D Objects** (SIGGRAPH Asia 2026): pick a part of a 3D object
+by clicking on a rendered view, and get that part back as its own mesh, posed
+in the object's frame. This release contains everything needed to run the
 gradio demo:
 
 ```
@@ -44,8 +46,10 @@ The script pins every package to the versions this release was verified with
 and builds the CUDA extensions (`o_voxel`, `cumesh`, `flex_gemm`,
 `nvdiffrast`, `cubvh`, `pytorch3d`, `gsplat`, `torch_cluster`) from their
 upstream sources; it ends with an import self-check. `nvdiffrec` is built too
-but treated as optional — only TRELLIS.2's PBR renderer uses it. Prerequisites: conda, a CUDA
-toolkit whose `nvcc` matches the cu124 wheels, git and a C++ compiler.
+but treated as optional — only TRELLIS.2's PBR renderer uses it.
+
+Prerequisites: conda, a CUDA toolkit whose `nvcc` matches the cu124 wheels,
+git and a C++ compiler.
 
 ## Weights
 
@@ -138,3 +142,16 @@ EU, UK, or South Korea.
 * Training entry points (`train_sam3d_part_ss.py`, `dataset.py`) are included
   only because the app imports helper functions from them; their data paths
   point to internal storage and they are not runnable as released.
+
+## Citation
+
+```bibtex
+@inproceedings{chang2026sam3dpart,
+  title     = {SAM3D-Part: Interactive Part Selection and Generation from 3D Objects},
+  author    = {Chang, Jiahao and Du, Dong and Sun, Wanhu and Zheng, Yujian and
+               Pan, Chuanyu and Zhao, Bowen and Ye, Chongjie and Hu, Yuanming and
+               Han, Xiaoguang},
+  booktitle = {SIGGRAPH Asia 2026 Conference Papers},
+  year      = {2026}
+}
+```

@@ -11,9 +11,9 @@ pipeline_tag: image-to-3d
 
 # SAM3D-Part — model weights
 
-Weights for **SAM3D-Part**, interactive part-level 3D generation: click a part
-on a rendered mesh and get that part as a separate 3D mesh, posed in the
-object's frame (SIGGRAPH Asia 2026).
+Weights for **SAM3D-Part: Interactive Part Selection and Generation from 3D
+Objects** (SIGGRAPH Asia 2026) — click a part on a rendered mesh and get that
+part back as its own 3D mesh, posed in the object's frame.
 
 Code: https://github.com/Jiahao620/sam3d-part
 
@@ -74,13 +74,15 @@ consistency with the pipeline they are part of.
 
 See `NOTICE.md` in the code repository for the full component/license mapping.
 
-<!-- ## Citation
+## Citation
 
 ```bibtex
-@inproceedings{sam3dpart2026,
-  title     = {SAM3D-Part: <论文标题>},
-  author    = {<作者列表>},
-  booktitle = {SIGGRAPH Asia},
+@inproceedings{chang2026sam3dpart,
+  title     = {SAM3D-Part: Interactive Part Selection and Generation from 3D Objects},
+  author    = {Chang, Jiahao and Du, Dong and Sun, Wanhu and Zheng, Yujian and
+               Pan, Chuanyu and Zhao, Bowen and Ye, Chongjie and Hu, Yuanming and
+               Han, Xiaoguang},
+  booktitle = {SIGGRAPH Asia 2026 Conference Papers},
   year      = {2026}
 }
-``` -->
+```
