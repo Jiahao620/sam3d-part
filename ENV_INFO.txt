@@ -1,0 +1,2 @@
+python: Python 3.11.0
+torch: 2.6.0+cu124 | cuda: 12.4

@@ -1,0 +1,6 @@
+Place the SAM3D-Part stage-1 DiT here:
+
+    sam3dpart_stage1_dit.ckpt        (7.2 GB)
+
+Download from our HuggingFace repo (see README "Weights"):
+    hf download bj6/sam3d-part stage1/sam3dpart_stage1_dit.ckpt --local-dir checkpoints

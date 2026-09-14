@@ -1,0 +1,4 @@
+Place the seven SAM 3D Objects binaries here (see README "Weights"):
+ss_generator.ckpt slat_generator.ckpt ss_encoder.pt ss_decoder.ckpt
+slat_decoder_gs.ckpt slat_decoder_gs_4.ckpt slat_decoder_mesh.ckpt
+Keep the shipped *.yaml files as-is.

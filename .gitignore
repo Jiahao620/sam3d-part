@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+output_sample/
+*.log
+nohup.out
+*.tar.gz
+
+# 大权重不进 git（见 README「Weights」：从 HuggingFace / Meta 下载）
+checkpoints/**/*.ckpt
+checkpoints/**/*.pt
+checkpoints/**/*.safetensors
+weights/**/*.pth
+
+# 但配置与说明文件必须随代码走 —— 其中 4 个 yaml 是本项目修改过的版本，
+# 用 Meta 原版会导致 shape 不匹配
+!checkpoints/**/*.yaml
+!weights/**/*.yaml
+!**/DOWNLOAD.txt

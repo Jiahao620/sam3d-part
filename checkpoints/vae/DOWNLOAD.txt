@@ -1,0 +1,8 @@
+Place our trained VAE weights here:
+
+    xyz_decoder.pt     (458 MB)  REQUIRED for inference (part pose from voxels)
+    occ_encoder.pt     (227 MB)  REQUIRED at pipeline init
+    xyz_encoder.pt     (458 MB)  optional -- only needed to re-train / re-encode latents
+
+Download from our HuggingFace repo (see README "Weights"):
+    hf download bj6/sam3d-part --include "vae/*" --local-dir checkpoints
