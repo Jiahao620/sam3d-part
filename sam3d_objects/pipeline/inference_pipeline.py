@@ -645,7 +645,6 @@ class InferencePipeline:
         ss_generator = self.models["ss_generator"]
         ss_decoder = self.models["ss_decoder"]
         # import numpy as np
-        # a = np.load("/root/jiahao/code/sam-3d-objects/partgen_data/part_renders/3d-future_00a4a7d6a85fad4a05724ef0c6831a96cbe3517efab88aac808ddedf2da5c453/render_results_2.npz", allow_pickle=True)
         # device = self.models['ss_encoder'].device
         # ss = torch.zeros(64, 64, 64, dtype=torch.long, device=device)
         # input_points = torch.tensor(a['coords'], dtype=torch.long, device=device)
