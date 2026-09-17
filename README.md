@@ -26,6 +26,9 @@ Xiaoguang Han<sup>1,2,6&sect;</sup>
 <sup>&Dagger;</sup>Project leader.&nbsp;&nbsp;
 <sup>&sect;</sup>Corresponding authors.</sub>
 
+[![Paper](https://img.shields.io/badge/arXiv-PDF-b31b1b)](https://arxiv.org/abs/2609.15639)
+[![Weights](https://img.shields.io/badge/🤗%20Hugging%20Face-Weights-yellow)](https://huggingface.co/bj6/sam3d-part)
+
 ![SAM3D-Part teaser](assets/teaser.png)
 
 </div>
@@ -171,19 +174,15 @@ EU, UK, or South Korea.
   only because the app imports helper functions from them; their data paths
   point to internal storage and they are not runnable as released.
 
-<!-- The paper is not public yet. Uncomment once it is, and check the
-     booktitle against the official ACM proceedings name.
-
 ## Citation
 
 ```bibtex
-@inproceedings{chang2026sam3dpart,
-  title     = {SAM3D-Part: Interactive Part Selection and Generation from 3D Objects},
-  author    = {Chang, Jiahao and Du, Dong and Sun, Wanhu and Zheng, Yujian and
-               Pan, Chuanyu and Zhao, Bowen and Ye, Chongjie and Hu, Yuanming and
-               Han, Xiaoguang},
-  booktitle = {SIGGRAPH Asia 2026 Conference Papers},
-  year      = {2026}
+@article{chang2026sam3dpart,
+  title   = {SAM3D-Part: Interactive Part Selection and Generation from 3D Objects},
+  author  = {Chang, Jiahao and Du, Dong and Sun, Wanhu and Zheng, Yujian and
+             Pan, Chuanyu and Zhao, Bowen and Ye, Chongjie and Hu, Yuanming and
+             Han, Xiaoguang},
+  journal = {arXiv preprint arXiv:2609.15639},
+  year    = {2026}
 }
 ```
--->

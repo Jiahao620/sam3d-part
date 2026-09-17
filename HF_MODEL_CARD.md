@@ -15,7 +15,7 @@ Weights for **SAM3D-Part: Interactive Part Selection and Generation from 3D
 Objects** (SIGGRAPH Asia 2026) — click a part on a rendered mesh and get that
 part back as its own 3D mesh, posed in the object's frame.
 
-Code: https://github.com/Jiahao620/sam3d-part
+Paper: https://arxiv.org/abs/2609.15639&nbsp;&nbsp;·&nbsp;&nbsp;Code: https://github.com/Jiahao620/sam3d-part
 
 These files are only the weights we trained. Running inference also needs the
 SAM 3D Objects checkpoints, SAM ViT-H, TRELLIS.2 and Hunyuan3D 2.1 — see the
@@ -58,19 +58,15 @@ consistency with the pipeline they are part of.
 
 See `NOTICE.md` in the code repository for the full component/license mapping.
 
-<!-- The paper is not public yet. Uncomment once it is, and check the
-     booktitle against the official ACM proceedings name.
-
 ## Citation
 
 ```bibtex
-@inproceedings{chang2026sam3dpart,
-  title     = {SAM3D-Part: Interactive Part Selection and Generation from 3D Objects},
-  author    = {Chang, Jiahao and Du, Dong and Sun, Wanhu and Zheng, Yujian and
-               Pan, Chuanyu and Zhao, Bowen and Ye, Chongjie and Hu, Yuanming and
-               Han, Xiaoguang},
-  booktitle = {SIGGRAPH Asia 2026 Conference Papers},
-  year      = {2026}
+@article{chang2026sam3dpart,
+  title   = {SAM3D-Part: Interactive Part Selection and Generation from 3D Objects},
+  author  = {Chang, Jiahao and Du, Dong and Sun, Wanhu and Zheng, Yujian and
+             Pan, Chuanyu and Zhao, Bowen and Ye, Chongjie and Hu, Yuanming and
+             Han, Xiaoguang},
+  journal = {arXiv preprint arXiv:2609.15639},
+  year    = {2026}
 }
 ```
--->
